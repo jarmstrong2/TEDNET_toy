@@ -17,7 +17,7 @@ local matio = require 'matio'
 local cmd = torch.CmdLine()
 
 cmd:text()
-cmd:text('Script for training model.')
+cmd:text('Script for Sound Sampling.')
 
 cmd:option('-inputSize' , 61, 'number of input dimension')
 cmd:option('-hiddenSize' ,800, 'number of hidden units in lstms')
@@ -27,6 +27,7 @@ cmd:option('-numMixture' , 5, 'number of mixture components in output layer')
 cmd:option('-modelFilename' , 'relumodel.t7', 'model filename')
 cmd:option('-testString' , 'somebodys life is about to get terrible!', 'string for testing')
 cmd:option('-straightScale' , '0.7', 'scaling components for synthesis')
+cmd:option('-isCovarianceFull' , true, 'true if full covariance, o.w. diagonal covariance')
 
 cmd:text()
 opt = cmd:parse(arg)
