@@ -33,7 +33,7 @@ command += '-numMixture ' + args.numMixture + ' '
 command += '-modelFilename ' + args.modelFilename + ' '
 command += '-testString ' + '"' + args.testString + '"' + ' '
 command += '-straightScale ' + args.straightScale  + ' '
-command += '-isCovarianceFull ' + '"' + args.isCovarianceFull '"'
+command += '-isCovarianceFull ' + '"' + args.isCovarianceFull + '"'
 
 subprocess.call(command, shell=True)
 
