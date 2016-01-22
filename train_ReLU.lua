@@ -301,6 +301,9 @@ function feval(x)
     end
     
     grad_params:div(numberOfPasses)
+    if opt.useAveragedLoss then
+        grad_params:div(sampleSize)
+    end
     
     -- clip gradient element-wise
     grad_params:clamp(-10, 10)
