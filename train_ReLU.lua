@@ -317,7 +317,7 @@ for i = 1, iterations do
     batchCount = i
 
     local _, loss = optim.adam(feval, params, optim_state)
-
+    collectgarbage()
     print(string.format("update param, loss = %6.8f, gradnorm = %6.4e", loss[1], grad_params:clone():norm()))
     if i % opt.evalEvery == 0 then
         print(string.format("iteration %4d, loss = %6.8f, gradnorm = %6.4e", i, loss[1], grad_params:norm()))

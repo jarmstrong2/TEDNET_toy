@@ -24,37 +24,53 @@ function mixture.gauss(inputSize, uDimSize, nMixture)
     local pi_pack = nn.SplitTable(2,3)(pi_reshaped)
     local target_reshaped = nn.Reshape(1, inputSize)(target)
 
-    for i = 1, nMixture do
-        local u_set = nn.SelectTable(i)(u_pack)
-        local mu_set = nn.SelectTable(i)(mu_pack)
-        local pi_set = nn.SelectTable(i)(pi_pack)
 
-        local sigma = nn.CAddTable()({nn.MM()({nn.Transpose({2,3})(u_set), u_set}), eps})
 
-        local det_sigma_2_pi = nn.AddConstant(inputSize * torch.log(2 * math.pi))
-        (nn.LogDeterminant()(sigma))
+    if opt.isCovarianceFull == true then
+        for i = 1, nMixture do
+            local u_set = nn.SelectTable(i)(u_pack)
+            local mu_set = nn.SelectTable(i)(mu_pack)
+            local pi_set = nn.SelectTable(i)(pi_pack)
 
-        local sqr_det_sigma_2_pi = nn.MulConstant(-0.5)(det_sigma_2_pi)
+            local mixture_result
+            local sigma = nn.CAddTable()({nn.MM()({nn.Transpose({2,3})(u_set), u_set}), eps})
 
-        local target_mu = nn.CAddTable()({target_reshaped, nn.MulConstant(-1)(mu_set)})
-        local transpose_target_mu = nn.Transpose({2,3})(target_mu)
-        local inv_sigma = nn.Inverse()(sigma)
-        local transpose_target_mu_sigma = 
-        nn.MM()({target_mu, inv_sigma})
-        local transpose_target_mu_sigma_target_mu = 
-        nn.MM()({transpose_target_mu_sigma, transpose_target_mu})
-        local exp_term = nn.MulConstant(-0.5)(transpose_target_mu_sigma_target_mu)
+            local det_sigma_2_pi = nn.AddConstant(inputSize * torch.log(2 * math.pi))
+            (nn.LogDeterminant()(sigma))
+            local sqr_det_sigma_2_pi = nn.MulConstant(-0.5)(det_sigma_2_pi)
 
-        local mixture_result = nn.CAddTable()({pi_set, sqr_det_sigma_2_pi, exp_term})
+            local target_mu = nn.CAddTable()({target_reshaped, nn.MulConstant(-1)(mu_set)})
+            local transpose_target_mu = nn.Transpose({2,3})(target_mu)
+            local inv_sigma = nn.Inverse()(sigma)
+            local transpose_target_mu_sigma = 
+            nn.MM()({target_mu, inv_sigma})
+            local transpose_target_mu_sigma_target_mu = 
+            nn.MM()({transpose_target_mu_sigma, transpose_target_mu})
 
-        if i == 1 then
-            join_mixture_result = mixture_result
-        else
-            join_mixture_result = nn.JoinTable(2)({join_mixture_result, 
-                mixture_result})
+            local exp_term = nn.MulConstant(-0.5)(transpose_target_mu_sigma_target_mu)
+
+            local mixture_result = nn.CAddTable()({pi_set, sqr_det_sigma_2_pi, exp_term})
+
+            if i == 1 then
+                join_mixture_result = mixture_result
+            else
+                join_mixture_result = nn.JoinTable(2)({join_mixture_result, 
+                    mixture_result})
+            end
         end
+    else
+        local sqr_det_sigma_2_pi = nn.MulConstant(-1.)(nn.AddConstant(0.5*inputSize * torch.log(2 * math.pi))(nn.Sum(4)(nn.Log()(u_reshaped))))
+        target_reshaped = nn.Replicate(nMixture,2)(target_reshaped)
+        local target_mu_sqr = nn.Square()(nn.CAddTable()({target_reshaped, nn.MulConstant(-1)(mu_reshaped)}))
+        -- hack up a dummy epsilon
+        local eps_zero = nn.Replicate(1,3)(nn.Replicate(nMixture, 2)(nn.Sum(3)(nn.MulConstant(0.)(eps))))
+        local sigma = nn.CAddTable()({nn.Square()(u_reshaped), eps_zero})
+        local exp_term = nn.MulConstant(-0.5)(nn.Sum(4)(nn.CDivTable()({target_mu_sqr, sigma})))
+
+        local mixture_result = nn.CAddTable()({pi_reshaped, sqr_det_sigma_2_pi, exp_term})
+        join_mixture_result = nn.Reshape(nMixture)(mixture_result)
     end
-    
+        
     -- Essentially this is the same a addlogsumexp   
     local max_mixture = nn.Max(2)(join_mixture_result)
     local max_expanded = nn.MulConstant(-1)(nn.Replicate(nMixture, 2, 2)(max_mixture))

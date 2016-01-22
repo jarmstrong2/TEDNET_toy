@@ -20,5 +20,7 @@ cmd:option('-reluSize', 400, 'number of ReLU units')
 cmd:text()
 opt = cmd:parse(arg)
 
+print(opt)
+
 dofile('model_ReLU.lua')
 dofile('train_ReLU.lua')
