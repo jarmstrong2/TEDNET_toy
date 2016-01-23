@@ -115,6 +115,7 @@ end
 
 
 straightMat:mul(opt.straightScale)
+
 std = torch.load('toy_std.t7')
 mean1 = torch.load('toy_mean.t7')
 rs_std = torch.expand(std, opt.maxlen -1, opt.inputSize)

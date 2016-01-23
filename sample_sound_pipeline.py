@@ -15,7 +15,6 @@ parser.add_argument("-numMixture", default='5', help="number of mixture componen
 parser.add_argument("-modelFilename", default="relumodel.t7", help="model filename")
 parser.add_argument("-testString", default="somebodys life is about to get terrible!", help="string for testing")
 parser.add_argument("-straightScale", default='0.7', help="scaling components for synthesis")
-parser.add_argument("-isCovarianceFull", default='true', help="is covariance full")
 
 #optional arguments for STRAIGHT
 parser.add_argument("-straightPath", default='../TEDNET_toy/strght.mat', help="path to matlab file for STRAIGHT")
@@ -33,7 +32,8 @@ command += '-numMixture ' + args.numMixture + ' '
 command += '-modelFilename ' + args.modelFilename + ' '
 command += '-testString ' + '"' + args.testString + '"' + ' '
 command += '-straightScale ' + args.straightScale  + ' '
-command += '-isCovarianceFull ' + '"' + args.isCovarianceFull + '"'
+
+print(command)
 
 subprocess.call(command, shell=True)
 
@@ -46,4 +46,4 @@ print(command)
 subprocess.call(command, shell=True)
 
 # reset terminal as matlab is doing something strange to STDOUT
-subprocess.call('reset', shell=True)
+#subprocess.call('reset', shell=True)
