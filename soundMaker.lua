@@ -116,8 +116,8 @@ end
 
 straightMat:mul(opt.straightScale)
 
-std = torch.load('toy_std.t7')
-mean = torch.load('toy_mean.t7')
+std = torch.load('toy_std_61_sing.t7')
+mean = torch.load('toy_mean_61_sing.t7')
 --rs_std = torch.expand(std, opt.maxlen -1, opt.inputSize)
 --rs_mean = torch.expand(mean1, opt.maxlen-1, opt.inputSize)
 newin = straightMat:float() * std
