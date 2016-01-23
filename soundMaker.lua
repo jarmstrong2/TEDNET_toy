@@ -117,11 +117,11 @@ end
 straightMat:mul(opt.straightScale)
 
 std = torch.load('toy_std.t7')
-mean1 = torch.load('toy_mean.t7')
-rs_std = torch.expand(std, opt.maxlen -1, opt.inputSize)
-rs_mean = torch.expand(mean1, opt.maxlen-1, opt.inputSize)
-newin = torch.cmul(straightMat:float(), rs_std:float())
-newin = newin:float() + rs_mean:float()
+mean = torch.load('toy_mean.t7')
+--rs_std = torch.expand(std, opt.maxlen -1, opt.inputSize)
+--rs_mean = torch.expand(mean1, opt.maxlen-1, opt.inputSize)
+newin = straightMat:float() * std
+newin = newin:float() + mean
 matio.save('strght.mat', newin)
 gnuplot.pngfigure('attentionmat.png')
 gnuplot.imagesc(phiMat:squeeze(2),'color')
