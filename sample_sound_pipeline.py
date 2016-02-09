@@ -13,17 +13,18 @@ parser.add_argument("-dimSize", default='2', help="number of hidden units in lst
 parser.add_argument("-maxlen", default='500', help="max sequence length")
 parser.add_argument("-numMixture", default='5', help="number of mixture components in output layer")
 parser.add_argument("-modelFilename", default="relumodel.t7", help="model filename")
-parser.add_argument("-testString", default="somebodys life is about to get terrible!", help="string for testing")
+parser.add_argument("-testString", default="which was, wow, somebodys screwed!", help="string for testing")
 parser.add_argument("-straightScale", default='0.7', help="scaling components for synthesis")
 
 #optional arguments for STRAIGHT
 parser.add_argument("-straightPath", default='../TEDNET_toy/strght.mat', help="path to matlab file for STRAIGHT")
 parser.add_argument("-wavePath", default='../TEDNET_toy/sampleSound.wav', help="path to file to save sample sound from STRAIGHT")
+parser.add_argument("-straightDir", default='../STRAIGHTV40_007d/', help="path to STRAIGHT library")
 
 args = parser.parse_args()
 
 # get STRAIGHT sample vector
-command = 'th soundMaker.lua '
+command = 'th soundMaker3.lua '
 command += '-inputSize ' + args.inputSize + ' '
 command += '-hiddenSize ' + args.hiddenSize + ' '
 command += '-dimSize ' + args.dimSize + ' '
@@ -35,7 +36,7 @@ command += '-straightScale ' + args.straightScale
 
 subprocess.call(command, shell=True)
 
-command = 'matlab -r "cd(\'../STRAIGHTV40_007d/\'); getSound61('
+command = 'matlab -r "cd(\'' + args.straightDir + '\'); getSound61('
 command += "'" + args.straightPath + "',"
 command += "'" + args.wavePath + "'"
 command += '); quit;"'

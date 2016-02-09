@@ -4,8 +4,8 @@ require 'nn'
 require 'nngraph'
 require 'optim'
 require 'getvocab'
-local LSTMH1 = require 'LSTMH1'
-local LSTMHN = require 'LSTMHN'
+local LSTMH1 = require 'LSTMH1bn'
+local LSTMHN = require 'LSTMHNbn'
 require 'window'
 require 'yHat'
 local model_utils=require 'model_utils'
@@ -43,15 +43,15 @@ local input_lstm_h4_h = nn.Identity()()
 local input_lstm_h4_c = nn.Identity()()
 local input_prev_kappa = nn.Identity()()
 
+local relu = nn.ReLU()(nn.BatchNormalization(opt.reluSize)(nn.Linear(opt.inputSize, opt.reluSize)(input_xin)))
+relu = nn.ReLU()(nn.BatchNormalization(opt.reluSize)(nn.Linear(opt.reluSize, opt.reluSize)(relu)))
 
-local relu = nn.ReLU()((nn.Linear(opt.inputSize, opt.reluSize)(input_xin)))
-relu = nn.ReLU()((nn.Linear(opt.reluSize, opt.reluSize)(relu)))
 
 local h1 = LSTMH1.lstm(opt.reluSize, opt.hiddenSize)({relu, input_w_prev, input_lstm_h1_c, input_lstm_h1_h})
 --local h1 = LSTMH1.lstm(opt.inputSize, opt.hiddenSize)({input_xin, input_w_prev, input_lstm_h1_c, input_lstm_h1_h})
 local h1_c = nn.SelectTable(1)(h1)
 local h1_h = nn.SelectTable(2)(h1)
-local w_output = nn.Window()({nn.Linear(opt.hiddenSize,30)(h1_h), input_context, input_prev_kappa})
+local w_output = nn.Window()({nn.BatchNormalization(30)(nn.Linear(opt.hiddenSize,30)(h1_h)), input_context, input_prev_kappa})
 local w_vector = nn.SelectTable(1)(w_output)
 local w_kappas_t = nn.SelectTable(2)(w_output)
 local w_phi_t = nn.SelectTable(3)(w_output)
@@ -65,19 +65,20 @@ local h4 = LSTMHN.lstm(opt.inputSize, opt.hiddenSize)({input_xin, w_vector, h3_h
 local h4_c = nn.SelectTable(1)(h4)
 local h4_h = nn.SelectTable(2)(h4)
 
+
 --local reluout = nn.ReLU()(nn.Linear(opt.hiddenSize*4, (opt.numMixture + (opt.inputSize * opt.numMixture) +
 --    (opt.inputSize * opt.numMixture * opt.dimSize)))
 --        (nn.JoinTable(2)({h1_h, h2_h, h3_h, h4_h})))
 
 --local y = nn.YHat()(reluout)
-local relu_output = nn.ReLU()((nn.Linear(opt.hiddenSize*4, opt.reluSize)(nn.JoinTable(2)({h1_h, h2_h, h3_h, h4_h}))))
-relu_output = nn.ReLU()((nn.Linear(opt.reluSize, opt.reluSize)
+local relu_output = nn.ReLU()(nn.BatchNormalization(opt.reluSize)(nn.Linear(opt.hiddenSize*4, opt.reluSize)(nn.JoinTable(2)({h1_h, h2_h, h3_h, h4_h}))))
+relu_output = nn.ReLU()(nn.BatchNormalization(opt.reluSize)(nn.Linear(opt.reluSize, opt.reluSize)
 		(relu_output)))
 
 local yhat_outputsize = (opt.numMixture + (opt.inputSize * opt.numMixture) +
     (opt.inputSize * opt.numMixture * opt.dimSize))
 
-local y = nn.YHat()((nn.Linear(opt.reluSize, (opt.numMixture + (opt.inputSize * opt.numMixture) +
+local y = nn.YHat()(nn.BatchNormalization(yhat_outputsize)(nn.Linear(opt.reluSize, (opt.numMixture + (opt.inputSize * opt.numMixture) +
     (opt.inputSize * opt.numMixture * opt.dimSize)))
 		(relu_output)))
 

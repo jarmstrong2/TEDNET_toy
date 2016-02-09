@@ -1,21 +1,45 @@
 require 'getbatch'
 require 'gnuplot'
 
+function getXBatch(output)
+                local pi_t, mu_t, u_t = unpack(output_y[t])
+                pi_t = pi_t:clone():float():reshape(opt.batchSize, opt.numMixture)
+                mu_t = mu_t:clone():float():reshape(opt.batchSize, opt.numMixture, opt.inputSize)
+                local maxPi, indMaxPi = torch.max((pi_t:float()),2)
+                --local chosenPi = torch.multinomial(torch.exp(pi_t:float()), 1):squeeze()
+
+                chosenPi = indMaxPi:squeeze()
+                mu_t:resize(opt.numMixture, 1, opt.inputSize) 
+                mu_t = mu_t[chosenPi]
+
+                return mu_t:double()
+            end
+
+
+
 -- get training dataset
-STRAIGHTdata = torch.load('toy_set.t7')
+if opt.useLargeDataset == true then
+    STRAIGHTdata = torch.load('toy_set_large.t7')
+else
+    STRAIGHTdata = torch.load('toy_set.t7')
+end
 dataSize = #STRAIGHTdata
 
 print('uploaded training data')
 
 -- get validation dataset
-valSTRAIGHTdata = torch.load('toy_set.t7')
+if opt.useLargeDataset == true then
+    valSTRAIGHTdata = torch.load('toy_set_large.t7')
+else
+    valSTRAIGHTdata = torch.load('toy_set.t7')
+end
 valdataSize = #valSTRAIGHTdata
 
 print('uploaded validation data')
 
 print('start training')
 
-params:uniform(-0.008, 0.008)
+--params:uniform(-0.08, 0.08)
 sampleSize = opt.batchSize
 numberOfPasses = opt.numPasses
 
@@ -105,7 +129,19 @@ function getValLoss()
         -- forward
         
         for t = 1, maxLen - 1 do
+            -- set training mode off
+            --clones.rnn_core[t]:evaluate()
+            clones.rnn_core[t]:training()
+
             local x_in = inputMat[{{},{1,opt.inputSize},{t}}]:squeeze(3)
+            if opt.feedPrediction == true then 
+                if t > 1 then
+                    x_in = getXBatch(output_y[t-1])
+                else
+                    x_in:fill(0.)
+                end
+            end
+
             local x_target = inputMat[{{},{1,opt.inputSize},{t+1}}]:squeeze(3)
 
             -- model 
@@ -120,15 +156,40 @@ function getValLoss()
             --loss = clones.criterion[t]:forward({pi:float(), mu:float(), u:float(),
             --    cmaskMat[{{},{},{t}}]:float(), x_target:float()}):sum() + loss  
             loss = clones.criterion[t]:forward({pi:cuda(), mu:cuda(), u:cuda(),
-                cmaskMat[{{},{},{t}}]:cuda(), x_target:cuda(), eps}):sum() + loss       
+                cmaskMat[{{},{},{t}}]:cuda(), x_target:cuda(), eps}):sum() + loss      
+
+            -- get the window attention and model output
+            function getX(output, idx)
+                local pi_t, mu_t, u_t = unpack(output_y[t])
+                pi_t = pi_t:clone():float():reshape(opt.batchSize, opt.numMixture)[idx] 
+                mu_t = mu_t:clone():float():reshape(opt.batchSize, opt.numMixture, opt.inputSize)[idx] 
+                local maxPi, indMaxPi = torch.max(torch.exp(pi_t:float()),1)
+                local chosenPi = torch.multinomial(torch.exp(pi_t:float()), 1):squeeze()
+
+                chosenPi = indMaxPi:squeeze()
+                mu_t:resize(opt.numMixture, 1, opt.inputSize) 
+                mu_t = mu_t[chosenPi]
+
+                return mu_t:double()
+            end
+
+            local x = getX(output_y[t], 1)
+            if t == 1 then
+                phiMat = _:clone():double()
+                straightMat = x
+            elseif t < 300 then
+                phiMat = torch.cat(phiMat, _:clone():double(), 2)
+                straightMat = torch.cat(straightMat, x, 1)
+            end
+
         end
 
         loss = loss/(valsampleSize * valnumberOfPasses)
         pi = nil
         mu = nil 
         u = nil
-        maxLen = nil
-        strs = nil
+        --maxLen = nil
+        --strs = nil
         inputMat = nil 
         maskMat = nil
         cuMat = nil
@@ -169,10 +230,9 @@ function feval(x)
         maxLen, strs, inputMat, cuMat, cmaskMat, elementCount, count
         = getBatch(count, STRAIGHTdata, sampleSize)
         ------------------------------------------------------------
-
-    --    if count > 100 then
+        if count > (#STRAIGHTdata-opt.batchSize) then
             count = 1
-      --  end
+        end
 
         if maxLen > MAXLEN then
             maxLen = MAXLEN
@@ -205,6 +265,9 @@ function feval(x)
             local x_target = inputMat[{{},{1,opt.inputSize},{t+1}}]:squeeze(3)
 
             -- model 
+            -- turn on training mode
+            clones.rnn_core[t]:training()
+
             output_y[t], kappa_prev[t], w[t], _, lstm_c_h1[t], lstm_h_h1[t],
             lstm_c_h2[t], lstm_h_h2[t], lstm_c_h3[t], lstm_h_h3[t], lstm_c_h4[t], lstm_h_h4[t]
         = unpack(clones.rnn_core[t]:forward({x_in:cuda(), cuMat:cuda(), 
@@ -297,7 +360,7 @@ function feval(x)
         input_h3_y = nil
         output_h3_y = nil
         output_y = nil
-        collectgarbage()
+        --collectgarbage()
     end
     
     grad_params:div(numberOfPasses)
@@ -320,7 +383,9 @@ for i = 1, iterations do
     batchCount = i
 
     local _, loss = optim.adam(feval, params, optim_state)
-    collectgarbage()
+    if i%2 == 0 then
+        collectgarbage()
+    end
     print(string.format("update param, loss = %6.8f, gradnorm = %6.4e", loss[1], grad_params:clone():norm()))
     if i % opt.evalEvery == 0 then
         print(string.format("iteration %4d, loss = %6.8f, gradnorm = %6.4e", i, loss[1], grad_params:norm()))
@@ -364,8 +429,44 @@ for i = 1, iterations do
                     iter = torch.cat(iter, iteraddition, 1)
             end
         end
-    gnuplot.pngfigure(opt.lossImageFN)
-    gnuplot.plot({iter, losses},{valiter, vallosses})
-    gnuplot.plotflush()
+        function plotCost()
+            gnuplot.pngfigure(opt.lossImageFN)
+            gnuplot.plot({iter, losses},{valiter, vallosses})
+            gnuplot.plotflush()
+        end
+        if not pcall(plotCost) then
+            print('had problem plot cost figure') 
+        end
+        print(phiMat:size())
+        
+        function plotAttn()
+            gnuplot.pngfigure(opt.lossImageFN..'attn.png')
+            gnuplot.imagesc(phiMat[1]:squeeze(2),'color')
+            
+            local xtics_str = ''
+            xtics_str = xtics_str .. '"'..strs[1]:sub(1,1)..'" '.. 1
+            for j = 2, #strs[1] do
+                xtics_str = xtics_str .. ', "'..strs[1]:sub(j,j)..'" '.. j
+            end
+            gnuplot.raw('set xtics ('..xtics_str..')')
+            gnuplot.plotflush()
+        end
+        
+        if not pcall(plotAttn) then
+            print('had problem plot attention figure') 
+        end
+
+        local matio = require 'matio'
+        straightMat:mul(0.95)
+        if opt.useLargeDataset == true then
+            toy_std = toy_std or torch.load('toy_std_large.t7')
+            toy_mean1 = toy_mean1 or torch.load('toy_mean_large.t7')
+        else
+            toy_std = toy_std or torch.load('toy_std.t7')
+            toy_mean1 = toy_mean1 or torch.load('toy_mean.t7')
+        end
+        local newin = straightMat:float() * toy_std
+        newin = newin:float() + toy_mean1
+        matio.save(opt.modelFilename .. '_straight.mat', newin)
     end
 end
